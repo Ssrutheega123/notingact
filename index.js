@@ -1,4 +1,4 @@
-﻿const express=require('express')
+const express=require('express')
 const mongoose=require('mongoose');
 const cors=require('cors');
 require('dotenv').config();
@@ -21,12 +21,17 @@ app.get('/', (req, res) => {
 });
 
 // MongoDB connection - use environment variable
-const MONGO_URL = process.env.MONGO_URL || "mongodb+srv://<ssruth>:<ssrutheega>@cluster0.2ryjrua.mongodb.net/?appname=Cluster0/notes";
-
+// Format: mongodb+srv://username:password@cluster0.2ryjrua.mongodb.net/database_name
+const MONGO_URL = process.env.MONGO_URL || "mongodb+srv://ssruth:ssrutheega@cluster0.2ryjrua.mongodb.net/notes";
 
 mongoose.connect(MONGO_URL)
-    .then(()=> console.log("MongoDB connected"))
-    .catch((err)=> console.error("MongoDB Connection error",err.message));      
+    .then(()=> {
+        console.log("MongoDB connected successfully");
+    })
+    .catch((err)=> {
+        console.error("MongoDB Connection error:", err.message);
+        // Don't exit - let the server start even if MongoDB fails initially
+    });      
 
 const notesSchema= new mongoose.Schema({
     title:{
@@ -56,22 +61,29 @@ const Note=mongoose.model("Note",notesSchema);
 
 app.get("/notes",async (req,res)=>{
     try{
-        const notes=await Note.find().sort({})
+        const notes=await Note.find().sort({createdAt: -1});
         res.json(notes);
     }catch(err){
-        res.status(500).json({message:"Server error while fetching notes"});    
+        console.error("Error fetching notes:", err);
+        res.status(500).json({message:"Server error while fetching notes", error: err.message});    
     }
 });
 
 app.post('/notes',async (req,res)=>{
     try {
+        // Input validation
+        if (!req.body.title || req.body.title.trim() === '') {
+            return res.status(400).json({message: 'Title is required'});
+        }
+
         const newNote=new Note({
-            title:req.body.title,
-            content:req.body.content
+            title:req.body.title.trim(),
+            content:req.body.content ? req.body.content.trim() : ''
         });
         await newNote.save();
         res.status(201).json({message:'note created successfully',note:newNote});   
     } catch(err) {
+        console.error("Error creating note:", err);
         res.status(500).json({message:"Server error while creating note", error: err.message});
     }
 });
@@ -81,28 +93,42 @@ app.put('/notes/:id', async (req,res)=>{
         const {id}=req.params;
         const {title,content}=req.body;
 
+        // Validate MongoDB ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({message: "Invalid note ID format"});
+        }
+
         const note=await Note.findById(id);
 
         if(!note) return res.status(404).json({message:"notes not found"});     
-        if(title!==undefined) note.title=title;
-        if(content!==undefined) note.content=content;
+        
+        if(title!==undefined && title!==null) note.title=title.trim();
+        if(content!==undefined && content!==null) note.content=content.trim();
         note.updatedAt=Date.now();
 
         await note.save();
         res.json({message:"note updated successfully",note});
     }catch(err){
-        res.status(500).json({message:"internal server error"});
+        console.error("Error updating note:", err);
+        res.status(500).json({message:"internal server error", error: err.message});
     }
 });
 
 app.delete('/notes/:id',async (req,res)=>{
     try{
         const {id}=req.params;
+        
+        // Validate MongoDB ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({message: "Invalid note ID format"});
+        }
+
         const note=await Note.findByIdAndDelete(id);
         if(!note) return res.status(404).json({message:'notes not found'});     
-        res.json({message:'note deleted successfully'});
+        res.json({message:'note deleted successfully', deletedNote: note});
     }catch(err){
-        res.status(500).json({message:"internal server error"});
+        console.error("Error deleting note:", err);
+        res.status(500).json({message:"internal server error", error: err.message});
     }
 })
 
@@ -111,3 +137,4 @@ const PORT = process.env.PORT || 8080;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`server is cooking at port ${PORT}`);
 });
+
