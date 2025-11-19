@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
 });
 
 // MongoDB connection - use environment variable
-const MONGO_URL = process.env.MONGO_URL || "mongodb+srv://<db_username>:<db_password>@cluster0.2ryjrua.mongodb.net/";
+const MONGO_URL = process.env.MONGO_URL || "mongodb+srv://<ssruth>:<ssrutheega>@cluster0.2ryjrua.mongodb.net/";
 
 mongoose.connect(MONGO_URL)
     .then(()=> console.log("MongoDB connected"))
